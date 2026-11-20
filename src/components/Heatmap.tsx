@@ -5,7 +5,7 @@ import { fmtDate, fmtShort } from '../lib/format'
 import type { Pv } from '../lib/types'
 import { pctClass } from './ui'
 
-/** Carte de chaleur : paramètres en lignes, prélèvements en colonnes, couleur = résultat en % de la limite. */
+/** Heatmap : paramètres en lignes, prélèvements en colonnes, couleur = résultat en % de la limite. */
 export function Heatmap({ pvs, series, onOpen }: { pvs: Pv[]; series: Series[]; onOpen: (id: string) => void }) {
   const [all, setAll] = useState(false)
   const cols = useMemo(() => [...pvs].sort((a, b) => a.ts - b.ts), [pvs])

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchResults, type CommuneHit, type FetchResult } from './lib/api'
 import { buildPvs, buildSeries, byGravity, coverage, lastExceedance } from './lib/analysis'
 import { demoRows } from './lib/demo'
@@ -17,7 +17,18 @@ import { Drawer } from './components/Drawer'
 import { Picker } from './components/Picker'
 import { PvTable } from './components/PvTable'
 
-type Tab = 'pv' | 'heat' | 'trend' | 'net' | 'coverage'
+type Tab = 'pv' | 'heat' | '3d' | 'trend' | 'net' | 'coverage'
+
+const Relief3D = lazy(() => import('./components/Relief3D'))
+
+const NAV: [Tab, string, string][] = [
+  ['pv', 'Procès-verbaux', '<path d="M6 3h9l4 4v14H6z M14 3v5h5 M9 12h7 M9 16h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'],
+  ['heat', 'Heatmap', '<path d="M4 4h5v5H4z M10 4h5v5h-5z M16 4h4v5h-4z M4 10h5v5H4z M10 10h5v5h-5z M16 10h4v5h-4z M4 16h5v4H4z M10 16h5v4h-5z" fill="currentColor" opacity=".85"/>'],
+  ['3d', 'Relief 3D', '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z M12 12l8-4.5 M12 12v9 M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'],
+  ['trend', 'Évolution', '<path d="M3 17l5-6 4 4 8-9 M3 21h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'],
+  ['net', 'Réseaux', '<circle cx="5" cy="6" r="2.5" fill="currentColor"/><circle cx="5" cy="18" r="2.5" fill="currentColor"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/><path d="M7 6.5c6 0 6 5.5 10 5.5 M7 17.5c6 0 6-5.5 10-5.5" fill="none" stroke="currentColor" stroke-width="1.8"/>'],
+  ['coverage', 'Couverture des analyses', '<path d="M4 20V10 M10 20V4 M16 20v-8 M21 20H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'],
+]
 
 const params = new URLSearchParams(window.location.search)
 const DEMO = params.get('demo') === '1'
@@ -321,34 +332,19 @@ export default function App() {
 
                 <SummaryBar stats={stats} active={status} onSelect={(s) => { setStatus(s); setTab('pv') }} last={last} onOpen={setOpenId} />
 
-                {pvs.length > 0 && (
-                  <section className="barcode-wrap">
-                    <h2>Chronologie des prélèvements</h2>
-                    <p className="muted">Un repère par prélèvement : les non-conformes (✕ rouge) et les références dépassées (▲) ressortent. Cliquez un repère pour ouvrir le procès-verbal.</p>
-                    <Timeline pvs={pvs} onOpen={setOpenId} />
-                    <h2 className="h2-sep">Quelles analyses à chaque prélèvement ?</h2>
-                    <p className="muted">Une colonne par prélèvement. Plus la case est foncée, plus la famille a été analysée en détail ; une case pâle signale une liste réduite.</p>
-                    <Barcode pvs={pvs} cov={cov} onOpen={setOpenId} />
-                  </section>
-                )}
-
-                <nav className="tabs" role="tablist">
-                  {(
-                    [
-                      ['pv', 'Procès-verbaux'],
-                      ['heat', 'Carte de chaleur'],
-                      ['trend', 'Évolution'],
-                      ['net', 'Réseaux'],
-                      ['coverage', 'Couverture des analyses'],
-                    ] as [Tab, string][]
-                  ).map(([id, label]) => (
-                    <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
-                      {label}
-                    </button>
-                  ))}
-                </nav>
-
+                <div className="layout">
+                  <nav className="sidenav" role="tablist" aria-label="Vues">
+                    {NAV.map(([id, label, icon]) => (
+                      <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>
+                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden dangerouslySetInnerHTML={{ __html: icon }} />
+                        <span>{label}</span>
+                        {id === 'pv' && stats.nc > 0 && <em className="nav-badge">{stats.nc}</em>}
+                      </button>
+                    ))}
+                  </nav>
+                  <div className="content">
                 <section className="panel" role="tabpanel">
+                  <h2 className="panel-title">{NAV.find((n) => n[0] === tab)?.[1]}</h2>
                   {tab === 'pv' && (
                     <div className="pv-tools">
                       <span className="muted small">
@@ -368,8 +364,18 @@ export default function App() {
                       </label>
                     </div>
                   )}
+                  {tab === 'pv' && pvs.length > 0 && (
+                    <div className="tl-wrap">
+                      <Timeline pvs={pvs} onOpen={setOpenId} />
+                    </div>
+                  )}
                   {tab === 'pv' && <PvTable pvs={shown} onOpen={setOpenId} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
                   {tab === 'heat' && <Heatmap pvs={pvs} series={series} onOpen={setOpenId} />}
+                  {tab === '3d' && (
+                    <Suspense fallback={<p className="empty">Chargement de la vue 3D…</p>}>
+                      <Relief3D pvs={pvs} series={series} onOpen={setOpenId} />
+                    </Suspense>
+                  )}
                   {tab === 'trend' && <Evolution series={series} onOpen={setOpenId} />}
                   {tab === 'net' && (
                     <Network
@@ -386,8 +392,16 @@ export default function App() {
                       }}
                     />
                   )}
-                  {tab === 'coverage' && <Coverage pvs={pvs} cov={cov} onOpen={setOpenId} />}
+                  {tab === 'coverage' && (
+                    <>
+                      <p className="muted">Une colonne par prélèvement. Plus la case est foncée, plus la famille a été analysée en détail ; une case pâle signale une liste réduite.</p>
+                      <Barcode pvs={pvs} cov={cov} onOpen={setOpenId} />
+                      <Coverage pvs={pvs} cov={cov} onOpen={setOpenId} />
+                    </>
+                  )}
                 </section>
+                  </div>
+                </div>
               </>
             )}
           </>
