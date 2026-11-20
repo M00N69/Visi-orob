@@ -13,6 +13,7 @@ import { Heatmap } from './components/Heatmap'
 import { Network } from './components/Network'
 import { SummaryBar, type StatusFilter } from './components/SummaryBar'
 import { Timeline } from './components/Timeline'
+import { Essential, PvCards } from './components/MobileView'
 import { Drawer } from './components/Drawer'
 import { Picker } from './components/Picker'
 import { PvTable } from './components/PvTable'
@@ -29,6 +30,28 @@ const NAV: [Tab, string, string][] = [
   ['net', 'Réseaux', '<circle cx="5" cy="6" r="2.5" fill="currentColor"/><circle cx="5" cy="18" r="2.5" fill="currentColor"/><circle cx="19" cy="12" r="2.5" fill="currentColor"/><path d="M7 6.5c6 0 6 5.5 10 5.5 M7 17.5c6 0 6-5.5 10-5.5" fill="none" stroke="currentColor" stroke-width="1.8"/>'],
   ['coverage', 'Couverture des analyses', '<path d="M4 20V10 M10 20V4 M16 20v-8 M21 20H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'],
 ]
+
+function useIsMobile() {
+  const q = '(max-width: 720px)'
+  const [m, setM] = useState(() => window.matchMedia(q).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(q)
+    const f = () => setM(mq.matches)
+    mq.addEventListener('change', f)
+    return () => mq.removeEventListener('change', f)
+  }, [])
+  return m
+}
+
+const Fold = ({ on, title, children }: { on: boolean; title: string; children: React.ReactNode }) =>
+  on ? (
+    <details className="m-details">
+      <summary>{title}</summary>
+      {children}
+    </details>
+  ) : (
+    <>{children}</>
+  )
 
 const params = new URLSearchParams(window.location.search)
 const DEMO = params.get('demo') === '1'
@@ -49,6 +72,10 @@ export default function App() {
   const [progress, setProgress] = useState<[number, number]>([0, 0])
   const [error, setError] = useState('')
 
+  const isMobile = useIsMobile()
+  const [full, setFull] = useState(params.get('full') === '1')
+  const [mview, setMview] = useState<'essential' | 'list'>('essential')
+  const simple = isMobile && !full
   const [tab, setTab] = useState<Tab>('pv')
   const [openId, setOpenId] = useState<string | null>(null)
   const [reseau, setReseau] = useState('')
@@ -191,6 +218,7 @@ export default function App() {
       {DEMO && <div className="demo-banner">Mode démonstration : données fictives générées localement. Retirez « ?demo=1 » de l'adresse pour interroger Hub'Eau.</div>}
 
       <main>
+        <Fold on={simple && !!commune} title={`Commune et période : ${commune?.name ?? ''}`}>
         <Picker
           region={region}
           dept={dept}
@@ -208,6 +236,7 @@ export default function App() {
             setTo(b)
           }}
         />
+        </Fold>
 
         {!commune && (
           <section className="start">
@@ -238,17 +267,21 @@ export default function App() {
               {!loading && !error && pvs.length > 0 && (
                 <div className="exports">
                   <button type="button" className="btn" onClick={() => exportPdf(ctx, pvs, { detail: true })}>
-                    Rapport PDF complet
+                    {simple ? 'Rapport PDF' : 'Rapport PDF complet'}
                   </button>
                   <button type="button" className="btn-quiet" onClick={() => exportEcarts(ctx, pvs, series)}>
                     PDF des écarts
                   </button>
-                  <button type="button" className="btn-quiet" onClick={() => exportPdf(ctx, pvs, { detail: false })}>
-                    Synthèse PDF
-                  </button>
-                  <button type="button" className="btn-quiet" onClick={() => exportCsv(ctx, pvs)}>
-                    Export CSV
-                  </button>
+                  {!simple && (
+                    <>
+                      <button type="button" className="btn-quiet" onClick={() => exportPdf(ctx, pvs, { detail: false })}>
+                        Synthèse PDF
+                      </button>
+                      <button type="button" className="btn-quiet" onClick={() => exportCsv(ctx, pvs)}>
+                        Export CSV
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </section>
@@ -277,6 +310,7 @@ export default function App() {
 
             {!loading && !error && rows.length > 0 && (
               <>
+                <Fold on={simple} title="Filtres et contrôle des données">
                 <section className="source" aria-label="Contrôle de complétude des données">
                   <span className={complete ? 'dot ok' : 'dot bad'} />
                   <span>
@@ -329,9 +363,57 @@ export default function App() {
                     </div>
                   </div>
                 </section>
+                </Fold>
 
-                <SummaryBar stats={stats} active={status} onSelect={(s) => { setStatus(s); setTab('pv') }} last={last} onOpen={setOpenId} />
+                <SummaryBar stats={stats} active={status} onSelect={(s) => { setStatus(s); setTab('pv'); setMview('list') }} last={last} onOpen={setOpenId} />
 
+                {simple ? (
+                  <>
+                    {mview === 'essential' ? (
+                      <Essential pvs={pvs} nc={stats.nc} onOpen={setOpenId} onList={() => setMview('list')} />
+                    ) : (
+                      <div className="m-list">
+                        <div className="pv-tools">
+                          <span className="muted small">
+                            {shown.length} prélèvement{shown.length > 1 ? 's' : ''}
+                            {status !== 'all' && (
+                              <button type="button" className="link" onClick={() => setStatus('all')}>
+                                tout afficher
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                        <PvCards pvs={[...shown].sort(byGravity)} onOpen={setOpenId} />
+                      </div>
+                    )}
+                    <nav className="bottomnav" aria-label="Navigation mobile">
+                      <button type="button" className={mview === 'essential' ? 'on' : ''} onClick={() => setMview('essential')}>
+                        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                          <path d="M12 3l9 8h-3v9h-12v-9H3z" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
+                        </svg>
+                        Essentiel
+                      </button>
+                      <button type="button" className={mview === 'list' ? 'on' : ''} onClick={() => setMview('list')}>
+                        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                          <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                        Prélèvements
+                      </button>
+                      <button type="button" onClick={() => setFull(true)}>
+                        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                          <path d="M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                        </svg>
+                        Vue complète
+                      </button>
+                    </nav>
+                  </>
+                ) : (
+                <>
+                {isMobile && (
+                  <button type="button" className="btn-quiet m-back" onClick={() => setFull(false)}>
+                    ← Vue simplifiée
+                  </button>
+                )}
                 <div className="layout">
                   <nav className="sidenav" role="tablist" aria-label="Vues">
                     {NAV.map(([id, label, icon]) => (
@@ -402,6 +484,8 @@ export default function App() {
                 </section>
                   </div>
                 </div>
+                </>
+                )}
               </>
             )}
           </>
