@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchResults, type CommuneHit, type FetchResult } from './lib/api'
-import { buildPvs, coverage } from './lib/analysis'
+import { buildPvs, buildSeries, byGravity, coverage, lastExceedance } from './lib/analysis'
 import { demoRows } from './lib/demo'
 import { FAMILIES } from './lib/families'
 import { iso10, monthsAgo } from './lib/format'
-import { exportCsv, exportPdf } from './lib/pdf'
+import { exportCsv, exportEcarts, exportPdf } from './lib/pdf'
 import type { Place, Pv, Row } from './lib/types'
 import { Barcode } from './components/Barcode'
 import { Coverage } from './components/Coverage'
+import { Evolution } from './components/Evolution'
+import { Heatmap } from './components/Heatmap'
+import { Network } from './components/Network'
+import { SummaryBar, type StatusFilter } from './components/SummaryBar'
+import { Timeline } from './components/Timeline'
 import { Drawer } from './components/Drawer'
 import { Picker } from './components/Picker'
 import { PvTable } from './components/PvTable'
 
-type Tab = 'pv' | 'coverage'
+type Tab = 'pv' | 'heat' | 'trend' | 'net' | 'coverage'
 
 const params = new URLSearchParams(window.location.search)
 const DEMO = params.get('demo') === '1'
@@ -38,6 +43,8 @@ export default function App() {
   const [reseau, setReseau] = useState('')
   const [site, setSite] = useState('')
   const [fams, setFams] = useState<Set<string>>(new Set())
+  const [status, setStatus] = useState<StatusFilter>('all')
+  const [sort, setSort] = useState<'date' | 'gravity'>('gravity')
 
   // Adresse partageable : la commune et la période sont dans l'URL.
   useEffect(() => {
@@ -125,6 +132,12 @@ export default function App() {
   }, [rows, site, reseau, fams])
 
   const cov = useMemo(() => coverage(pvs), [pvs])
+  const series = useMemo(() => buildSeries(pvs), [pvs])
+  const last = useMemo(() => lastExceedance(pvs), [pvs])
+  const shown = useMemo(() => {
+    const l = status === 'all' ? pvs : pvs.filter((p) => p.verdict === status)
+    return sort === 'gravity' ? [...l].sort(byGravity) : l
+  }, [pvs, status, sort])
   const open = pvs.find((p) => p.id === openId) ?? null
   const ctx = { commune: commune?.name ?? '', from, to, demo: DEMO }
 
@@ -216,6 +229,9 @@ export default function App() {
                   <button type="button" className="btn" onClick={() => exportPdf(ctx, pvs, { detail: true })}>
                     Rapport PDF complet
                   </button>
+                  <button type="button" className="btn-quiet" onClick={() => exportEcarts(ctx, pvs, series)}>
+                    PDF des écarts
+                  </button>
                   <button type="button" className="btn-quiet" onClick={() => exportPdf(ctx, pvs, { detail: false })}>
                     Synthèse PDF
                   </button>
@@ -303,27 +319,14 @@ export default function App() {
                   </div>
                 </section>
 
-                <section className="summary">
-                  <div>
-                    <b>{stats.n}</b> prélèvements
-                  </div>
-                  <div className="s-ok">
-                    <b>{stats.ok}</b> conformes
-                  </div>
-                  <div className="s-ref">
-                    <b>{stats.ref}</b> références dépassées
-                  </div>
-                  <div className="s-bad">
-                    <b>{stats.nc}</b> non conformes
-                  </div>
-                  <div>
-                    <b>{stats.lines.toLocaleString('fr-FR')}</b> résultats d'analyse
-                  </div>
-                </section>
+                <SummaryBar stats={stats} active={status} onSelect={(s) => { setStatus(s); setTab('pv') }} last={last} onOpen={setOpenId} />
 
                 {pvs.length > 0 && (
                   <section className="barcode-wrap">
-                    <h2>Quelles analyses à chaque prélèvement ?</h2>
+                    <h2>Chronologie des prélèvements</h2>
+                    <p className="muted">Un repère par prélèvement : les non-conformes (✕ rouge) et les références dépassées (▲) ressortent. Cliquez un repère pour ouvrir le procès-verbal.</p>
+                    <Timeline pvs={pvs} onOpen={setOpenId} />
+                    <h2 className="h2-sep">Quelles analyses à chaque prélèvement ?</h2>
                     <p className="muted">Une colonne par prélèvement. Plus la case est foncée, plus la famille a été analysée en détail ; une case pâle signale une liste réduite.</p>
                     <Barcode pvs={pvs} cov={cov} onOpen={setOpenId} />
                   </section>
@@ -333,6 +336,9 @@ export default function App() {
                   {(
                     [
                       ['pv', 'Procès-verbaux'],
+                      ['heat', 'Carte de chaleur'],
+                      ['trend', 'Évolution'],
+                      ['net', 'Réseaux'],
                       ['coverage', 'Couverture des analyses'],
                     ] as [Tab, string][]
                   ).map(([id, label]) => (
@@ -343,7 +349,43 @@ export default function App() {
                 </nav>
 
                 <section className="panel" role="tabpanel">
-                  {tab === 'pv' && <PvTable pvs={pvs} onOpen={setOpenId} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
+                  {tab === 'pv' && (
+                    <div className="pv-tools">
+                      <span className="muted small">
+                        {shown.length} procès-verbal{shown.length > 1 ? 'aux' : ''} affiché{shown.length > 1 ? 's' : ''}
+                        {status !== 'all' && (
+                          <button type="button" className="link" onClick={() => setStatus('all')}>
+                            tout afficher
+                          </button>
+                        )}
+                      </span>
+                      <label className="sort">
+                        Trier par{' '}
+                        <select value={sort} onChange={(e) => setSort(e.target.value as 'date' | 'gravity')}>
+                          <option value="gravity">gravité (non conformes d'abord)</option>
+                          <option value="date">date (récents d'abord)</option>
+                        </select>
+                      </label>
+                    </div>
+                  )}
+                  {tab === 'pv' && <PvTable pvs={shown} onOpen={setOpenId} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
+                  {tab === 'heat' && <Heatmap pvs={pvs} series={series} onOpen={setOpenId} />}
+                  {tab === 'trend' && <Evolution series={series} onOpen={setOpenId} />}
+                  {tab === 'net' && (
+                    <Network
+                      pvs={allPvs}
+                      onPickSite={(c) => {
+                        setSite(c)
+                        setReseau('')
+                        setTab('pv')
+                      }}
+                      onPickReseau={(c) => {
+                        setReseau(c)
+                        setSite('')
+                        setTab('pv')
+                      }}
+                    />
+                  )}
                   {tab === 'coverage' && <Coverage pvs={pvs} cov={cov} onOpen={setOpenId} />}
                 </section>
               </>
@@ -357,7 +399,7 @@ export default function App() {
         ouvertes : elle ne remplace pas les bulletins d'analyse officiels des ARS.
       </footer>
 
-      {open && <Drawer pv={open} onClose={() => setOpenId(null)} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
+      {open && <Drawer pv={open} series={series} onClose={() => setOpenId(null)} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
     </div>
   )
 }

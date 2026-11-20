@@ -154,3 +154,94 @@ export function coverage(pvs: Pv[]): FamilyCoverage[] {
 export function isLimited(count: number, max: number): boolean {
   return max >= 4 && count > 0 && count < max * 0.5
 }
+
+/* ---------- Résultat rapporté à la limite, séries par paramètre, récurrence ---------- */
+
+export interface Ratio {
+  /** Résultat en % de la limite de qualité (à défaut, de la référence). Plafonné à 200. */
+  pct: number
+  kind: 'limit' | 'ref'
+  bound: string
+}
+
+export function ratioOf(r: ParamRow): Ratio | null {
+  if (r.value === null) return null
+  const lim = parseBounds(r.limite_qualite_parametre)
+  const ref = parseBounds(r.reference_qualite_parametre)
+  const b = lim ?? ref
+  if (!b) return null
+  const v = r.value
+  const parts: number[] = []
+  if (b.max !== undefined) parts.push(b.max > 0 ? v / b.max : v > 0 ? 2 : 0)
+  if (b.min !== undefined) parts.push(v > 0 ? b.min / v : 2)
+  if (!parts.length) return null
+  return {
+    pct: Math.min(200, Math.max(...parts) * 100),
+    kind: lim ? 'limit' : 'ref',
+    bound: (lim ? r.limite_qualite_parametre : r.reference_qualite_parametre) ?? '',
+  }
+}
+
+export const paramKey = (r: Row) => r.code_parametre || r.libelle_parametre
+
+export interface SeriesPoint {
+  pvId: string
+  ts: number
+  date: string
+  value: number
+  flag: Flag
+  pct: number | null
+  installation: string
+}
+
+export interface Series {
+  key: string
+  label: string
+  unit: string
+  family: string
+  pts: SeriesPoint[]
+  nLimit: number
+  nRef: number
+  maxPct: number
+  limit: string
+  ref: string
+}
+
+/** Une série par paramètre ayant au moins un résultat numérique. */
+export function buildSeries(pvs: Pv[]): Series[] {
+  const map = new Map<string, Series>()
+  for (const pv of [...pvs].sort((a, b) => a.ts - b.ts)) {
+    for (const r of pv.rows) {
+      if (r.value === null) continue
+      const key = paramKey(r)
+      let s = map.get(key)
+      if (!s) {
+        s = { key, label: r.libelle_parametre, unit: r.libelle_unite ?? '', family: r.family, pts: [], nLimit: 0, nRef: 0, maxPct: 0, limit: '', ref: '' }
+        map.set(key, s)
+      }
+      const ra = ratioOf(r)
+      s.pts.push({ pvId: pv.id, ts: pv.ts, date: pv.date, value: r.value, flag: r.flag, pct: ra ? ra.pct : null, installation: pv.installation })
+      if (r.flag === 'limit') s.nLimit += 1
+      if (r.flag === 'ref') s.nRef += 1
+      if (ra && ra.pct > s.maxPct) s.maxPct = ra.pct
+      if (r.limite_qualite_parametre) s.limit = r.limite_qualite_parametre
+      if (r.reference_qualite_parametre) s.ref = r.reference_qualite_parametre
+    }
+  }
+  return [...map.values()]
+}
+
+/** Dernier prélèvement avec une limite dépassée, et le premier paramètre concerné. */
+export function lastExceedance(pvs: Pv[]): { pv: Pv; row: ParamRow } | null {
+  const pv = pvs.filter((p) => p.nLimit > 0).sort((a, b) => b.ts - a.ts)[0]
+  if (!pv) return null
+  return { pv, row: pv.rows.find((r) => r.flag === 'limit')! }
+}
+
+const GRAVITY: Record<Verdict, number> = { 'non-conforme': 0, reference: 1, inconnu: 2, conforme: 3 }
+export const byGravity = (a: Pv, b: Pv) => GRAVITY[a.verdict] - GRAVITY[b.verdict] || b.nLimit - a.nLimit || b.ts - a.ts
+
+export const VERDICT_GLYPH: Record<Verdict, string> = { conforme: '✓', reference: '!', 'non-conforme': '✕', inconnu: '?' }
+
+/** Texte « 52 mg/L ». */
+export const withUnit = (r: ParamRow) => `${r.display}${r.libelle_unite ? ' ' + r.libelle_unite : ''}`

@@ -276,3 +276,115 @@ footer { padding: 20px clamp(16px, 4vw, 48px); color: var(--ink-2); font-size: 1
 }
 
 .pv-table small.concl-text { max-width: 46ch; margin-top: 6px; color: var(--ink-2); }
+
+/* ---------- Lisibilité des écarts ---------- */
+.badge i { width: 17px; height: 17px; border-radius: 50%; display: inline-grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; line-height: 1; color: #fff; background: var(--ink-2); }
+.badge-conforme i { background: #1f6b43; }
+.badge-reference i { background: #8a5a0c; }
+.badge-non-conforme i { background: var(--bad); }
+.badge-non-conforme { box-shadow: inset 0 0 0 1.5px var(--bad); }
+
+/* Tuiles de synthèse */
+.summary-bar { margin-bottom: 26px; display: grid; gap: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { text-align: left; display: grid; gap: 2px; padding: 14px 16px; background: var(--paper); border: 1px solid var(--line); border-left-width: 6px; border-radius: var(--radius); }
+.tile:hover { border-color: var(--reef); }
+.tile.on { outline: 3px solid var(--ink); outline-offset: 1px; }
+.tile-n { font-family: var(--font-head); font-size: 34px; font-weight: 700; line-height: 1.1; display: flex; align-items: center; gap: 8px; }
+.tile-n i { font-style: normal; width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 15px; color: #fff; }
+.tile-l { font-weight: 650; }
+.tile-p { font-size: 12.5px; color: var(--ink-2); }
+.t-all { border-left-color: var(--ink-2); }
+.t-ok { border-left-color: var(--ok); } .t-ok .tile-n i { background: var(--ok); }
+.t-ref { border-left-color: var(--warn); } .t-ref .tile-n i { background: var(--warn); }
+.t-bad { border-left-color: var(--bad); } .t-bad .tile-n i { background: var(--bad); }
+.t-ref.has { background: var(--warn-bg); }
+.t-bad.has { background: var(--bad-bg); border-color: #efb8b1; border-left-color: var(--bad); }
+.t-bad.has .tile-n { color: var(--bad); }
+.last { margin: 0; padding: 10px 14px; border-radius: 8px; }
+.bad-line { background: var(--bad-bg); color: #7a1a11; }
+.ok-line { background: var(--ok-bg); color: #1f6b43; }
+.last .link { padding: 0; }
+
+/* Tableau des PV */
+.pv-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 14px 0 4px; }
+.sort select { height: 34px; border: 1px solid #b8c9cf; border-radius: 8px; padding: 0 8px; background: #fff; }
+.pv-table tbody tr.v-non-conforme { background: #fff6f5; box-shadow: inset 6px 0 0 var(--bad); }
+.pv-table tbody tr.v-reference { box-shadow: inset 6px 0 0 var(--warn); }
+.pv-table tbody tr.v-non-conforme:hover { background: var(--bad-bg); }
+.pv-table td:first-child { padding-left: 18px; }
+.pv-table .exc { display: block; margin-top: 4px; font-size: 13px; color: var(--bad); }
+.pv-table .exc em { font-style: normal; color: var(--ink-2); }
+
+/* Frise */
+.h2-sep { margin-top: 26px; }
+.timeline { margin: 14px 0 0; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px 12px; }
+.timeline svg { width: 100%; height: auto; display: block; }
+.timeline .axis { font-size: 12px; fill: var(--ink-2); }
+.timeline .pt { cursor: pointer; }
+.timeline .pt:hover circle, .timeline .pt:focus-visible circle { stroke: var(--ink); stroke-width: 2; }
+.lg-ok { background: var(--ok); opacity: 0.6; }
+
+/* Marge : barre résultat / limite */
+.mbar { display: inline-flex; align-items: center; gap: 8px; }
+.mbar-track { position: relative; width: 84px; height: 10px; border-radius: 5px; background: #e3eaee; overflow: hidden; display: block; }
+.mbar-track i { display: block; height: 100%; border-radius: 5px; background: #6fb88f; }
+.mbar-track b { position: absolute; top: -1px; bottom: -1px; left: 66.67%; width: 2px; background: var(--ink); }
+.mbar em { font-style: normal; font-size: 12px; color: var(--ink-2); min-width: 40px; }
+.mbar.p-mid .mbar-track i { background: #d8c54a; }
+.mbar.p-high .mbar-track i { background: #e79a3c; }
+.mbar.p-over .mbar-track i { background: var(--bad); }
+.mbar.p-over em { color: var(--bad); font-weight: 700; }
+.mbar.p-mid, .mbar.p-high, .mbar.p-over, .mbar.p-low { background: none; color: inherit; }
+
+/* Écarts constatés (tiroir) */
+.issues { border: 2px solid var(--bad); background: #fff8f7; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px; }
+.issues h3 { color: var(--bad); margin-bottom: 8px; font-size: 16px; }
+.issues ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.issues li { display: grid; grid-template-columns: minmax(150px, 1.1fr) 1.4fr auto; gap: 4px 14px; align-items: center; padding: 8px 0; border-top: 1px solid #f0cfca; }
+.issues li:first-child { border-top: 0; }
+.i-name { font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.i-name i { font-style: normal; width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; color: #fff; background: var(--bad); flex: none; }
+.i-ref .i-name i { background: var(--warn); }
+.i-val b { font-size: 18px; font-family: var(--font-head); }
+.i-limit .i-val b { color: var(--bad); }
+.i-val em { font-style: normal; color: var(--ink-2); margin-left: 6px; }
+.i-rec { grid-column: 1 / -1; font-size: 13px; color: var(--bad); font-weight: 600; }
+.i-rec.solo { color: var(--ink-2); font-weight: 500; }
+.issues li.i-ref { border-top-color: #ecd9ab; }
+
+/* Carte de chaleur */
+.hm-tools { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin-bottom: 10px; }
+.hm { border-collapse: separate; border-spacing: 2px; font-size: 13px; }
+.hm th, .hm td { padding: 0; }
+.hm thead th { position: sticky; top: 0; background: #fff; z-index: 2; }
+.hm .sticky { position: sticky; left: 0; background: #fff; z-index: 1; text-align: left; padding: 4px 10px; min-width: 230px; max-width: 300px; font-weight: 500; white-space: nowrap; }
+.hm thead .sticky { z-index: 3; font-weight: 650; }
+.hm .sticky i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 8px; }
+.hm .sticky small { color: var(--ink-2); margin-left: 8px; }
+.hm-col { border-bottom: 5px solid var(--line); }
+.hm-col.verdict-conforme { border-bottom-color: var(--ok); }
+.hm-col.verdict-reference { border-bottom-color: var(--warn); }
+.hm-col.verdict-non-conforme { border-bottom-color: var(--bad); }
+.hm-col button { border: 0; background: none; font-size: 11.5px; color: var(--ink-2); writing-mode: vertical-rl; transform: rotate(180deg); height: 58px; padding: 4px 0; }
+.hm-col button:hover { color: var(--reef-dark); text-decoration: underline; }
+.hm-cell { width: 28px; min-width: 28px; height: 26px; text-align: center; font-size: 11px; font-weight: 700; border-radius: 3px; cursor: pointer; }
+.hm-cell:hover { outline: 2px solid var(--ink); }
+.hm .cnt { padding: 0 10px; text-align: right; white-space: nowrap; position: sticky; right: 0; background: #fff; font-weight: 650; }
+.p-low { background: #cfe8da; }
+.p-mid { background: #f1e6a6; }
+.p-high { background: #f2b66d; color: #4a2c00; }
+.p-over { background: var(--bad); color: #fff; }
+.p-none { background: var(--mist); }
+.p-na { background: repeating-linear-gradient(135deg, #f3f6f8, #f3f6f8 4px, #eaf0f3 4px, #eaf0f3 8px); cursor: default; }
+.lg.p-low, .lg.p-mid, .lg.p-high, .lg.p-over, .lg.p-na { margin-left: 12px; }
+.recur { margin: 0; padding: 10px 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+.recur i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* Schéma des réseaux */
+.net { padding-top: 4px; }
+.net .pt { cursor: pointer; }
+
+@media (max-width: 720px) {
+  .issues li { grid-template-columns: 1fr; }
+}

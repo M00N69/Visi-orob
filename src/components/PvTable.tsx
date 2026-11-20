@@ -1,3 +1,4 @@
+import { withUnit } from '../lib/analysis'
 import { FAMILIES } from '../lib/families'
 import { fmtDateTime } from '../lib/format'
 import type { Pv } from '../lib/types'
@@ -18,7 +19,7 @@ export function PvTable({ pvs, onOpen, onPdf }: { pvs: Pv[]; onOpen: (id: string
       </thead>
       <tbody>
         {pvs.map((pv) => (
-          <tr key={pv.id} onClick={() => onOpen(pv.id)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onOpen(pv.id)}>
+          <tr key={pv.id} className={`v-${pv.verdict}`} onClick={() => onOpen(pv.id)} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onOpen(pv.id)}>
             <td className="nowrap">
               <strong>{fmtDateTime(pv.date)}</strong>
               <small>{pv.id}</small>
@@ -41,8 +42,16 @@ export function PvTable({ pvs, onOpen, onPdf }: { pvs: Pv[]; onOpen: (id: string
             <td>
               <VerdictBadge v={pv.verdict} compact />
               <small className="concl-text">{pv.conclusion}</small>
-              {pv.nLimit > 0 && <small className="bad">{pv.nLimit} limite(s) dépassée(s)</small>}
-              {pv.nRef > 0 && <small className="warn">{pv.nRef} référence(s) dépassée(s)</small>}
+              {pv.nLimit > 0 && <small className="bad">✕ {pv.nLimit} limite(s) dépassée(s)</small>}
+              {pv.rows
+                .filter((r) => r.flag === 'limit')
+                .slice(0, 3)
+                .map((r, i) => (
+                  <span key={i} className="exc">
+                    {r.libelle_parametre} <b>{withUnit(r)}</b> <em>(limite {r.limite_qualite_parametre})</em>
+                  </span>
+                ))}
+              {pv.nRef > 0 && <small className="warn">! {pv.nRef} référence(s) dépassée(s)</small>}
             </td>
             <td className="actions">
               <button
