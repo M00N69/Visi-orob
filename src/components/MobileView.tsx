@@ -61,7 +61,7 @@ export function Essential({ pvs, nc, onOpen, onList }: { pvs: Pv[]; nc: number; 
 }
 
 /** Un prélèvement = une carte tactile. */
-export function PvCards({ pvs, onOpen }: { pvs: Pv[]; onOpen: (id: string) => void }) {
+export function PvCards({ pvs, onOpen, searching = false }: { pvs: Pv[]; onOpen: (id: string) => void; searching?: boolean }) {
   const [n, setN] = useState(8)
   if (!pvs.length) return <p className="empty">Aucun prélèvement ne correspond.</p>
   return (
@@ -73,6 +73,7 @@ export function PvCards({ pvs, onOpen }: { pvs: Pv[]; onOpen: (id: string) => vo
             <VerdictBadge v={pv.verdict} compact />
           </span>
           <span className="m-card-sub">{pv.installation}</span>
+          {searching && <span className="m-matched">{pv.rows.map((r) => r.libelle_parametre).slice(0, 3).join(' · ')}</span>}
           {pv.rows
             .filter((r) => r.flag === 'limit')
             .slice(0, 2)

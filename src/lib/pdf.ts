@@ -11,6 +11,8 @@ export interface PdfContext {
   from: string
   to: string
   demo: boolean
+  /** Recherche de paramètre active, reprise dans l'en-tête des exports. */
+  q?: string
 }
 
 // Helvetica (police PDF standard) ne gère pas toute l'Unicode : on remplace les rares caractères hors Latin-1.
@@ -67,7 +69,7 @@ export function exportPdf(ctx: PdfContext, pvs: Pv[], opts: { detail: boolean; f
   doc.text(s(sorted.length === 1 ? `Procès-verbal d'analyse du ${fmtDate(sorted[0].date)}` : "Contrôle sanitaire de l'eau potable"), M, 40)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(11)
-  doc.text(s(`${ctx.commune} - période du ${fmtDate(ctx.from)} au ${fmtDate(ctx.to)}`), M, 62)
+  doc.text(s(`${ctx.commune} - période du ${fmtDate(ctx.from)} au ${fmtDate(ctx.to)}${ctx.q ? ` - recherche : ${ctx.q}` : ''}`), M, 62)
   if (ctx.demo) {
     doc.setTextColor(255, 200, 120)
     doc.text('DONNÉES DE DÉMONSTRATION - SANS VALEUR', W - M, 62, { align: 'right' })
@@ -232,7 +234,7 @@ export function exportEcarts(ctx: PdfContext, pvs: Pv[], series: Series[]) {
   doc.text('Synthèse des écarts - eau potable', M, 40)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(11)
-  doc.text(s(`${ctx.commune} - période du ${fmtDate(ctx.from)} au ${fmtDate(ctx.to)}`), M, 62)
+  doc.text(s(`${ctx.commune} - période du ${fmtDate(ctx.from)} au ${fmtDate(ctx.to)}${ctx.q ? ` - recherche : ${ctx.q}` : ''}`), M, 62)
   if (ctx.demo) {
     doc.setTextColor(255, 200, 120)
     doc.text('DONNÉES DE DÉMONSTRATION - SANS VALEUR', W - M, 62, { align: 'right' })

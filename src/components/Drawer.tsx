@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CONF_LABEL, paramKey, ratioOf, withUnit, type Series } from '../lib/analysis'
 import { FAMILIES, FAMILY_BY_ID } from '../lib/families'
+import { parseQuery, rowMatches } from '../lib/search'
 import { fmtDateTime } from '../lib/format'
 import type { Pv } from '../lib/types'
 import { FlagMark, MarginBar, VerdictBadge } from './ui'
@@ -13,6 +14,7 @@ export function Drawer({ pv, series, onClose, onPdf }: { pv: Pv; series: Series[
   )
   const [q, setQ] = useState('')
   const [onlyFlag, setOnlyFlag] = useState(false)
+  const terms = useMemo(() => parseQuery(q), [q])
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -21,16 +23,15 @@ export function Drawer({ pv, series, onClose, onPdf }: { pv: Pv; series: Series[
   }, [onClose])
 
   const groups = useMemo(() => {
-    const needle = q.trim().toLowerCase()
     return FAMILIES.map((f) => ({
       f,
       rows: pv.rows
         .filter((r) => r.family === f.id)
-        .filter((r) => !needle || r.libelle_parametre.toLowerCase().includes(needle))
+        .filter((r) => rowMatches(r, terms))
         .filter((r) => !onlyFlag || r.flag === 'limit' || r.flag === 'ref')
         .sort((a, b) => a.libelle_parametre.localeCompare(b.libelle_parametre, 'fr')),
     })).filter((g) => g.rows.length)
-  }, [pv, q, onlyFlag])
+  }, [pv, terms, onlyFlag])
 
   const confs = [
     ['Limites bactériologiques', pv.conf.limBact],
@@ -110,7 +111,7 @@ export function Drawer({ pv, series, onClose, onPdf }: { pv: Pv; series: Series[
           )}
 
           <div className="drawer-tools">
-            <input type="search" placeholder="Chercher un paramètre (ex. nitrates, atrazine)" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input type="search" placeholder="Chercher un paramètre ou une catégorie (ex. nitrates, atrazine, PFAS)" value={q} onChange={(e) => setQ(e.target.value)} />
             <label className="check">
               <input type="checkbox" checked={onlyFlag} onChange={(e) => setOnlyFlag(e.target.checked)} />
               Dépassements seulement

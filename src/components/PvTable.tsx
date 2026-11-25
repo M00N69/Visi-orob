@@ -4,7 +4,7 @@ import { fmtDateTime } from '../lib/format'
 import type { Pv } from '../lib/types'
 import { VerdictBadge } from './ui'
 
-export function PvTable({ pvs, onOpen, onPdf }: { pvs: Pv[]; onOpen: (id: string) => void; onPdf: (pv: Pv) => void }) {
+export function PvTable({ pvs, onOpen, onPdf, searching = false }: { pvs: Pv[]; onOpen: (id: string) => void; onPdf: (pv: Pv) => void; searching?: boolean }) {
   if (!pvs.length) return <p className="empty">Aucun procès-verbal ne correspond à ces filtres.</p>
   return (
     <table className="pv-table">
@@ -38,6 +38,9 @@ export function PvTable({ pvs, onOpen, onPdf }: { pvs: Pv[]; onOpen: (id: string
                   </span>
                 ))}
               </div>
+              {searching && (
+                <small className="matched">{pv.rows.map((r) => r.libelle_parametre).slice(0, 4).join(' · ')}</small>
+              )}
             </td>
             <td>
               <VerdictBadge v={pv.verdict} compact />

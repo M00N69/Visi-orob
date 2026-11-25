@@ -5,6 +5,7 @@ import { demoRows } from './lib/demo'
 import { FAMILIES } from './lib/families'
 import { iso10, monthsAgo } from './lib/format'
 import { exportCsv, exportEcarts, exportPdf } from './lib/pdf'
+import { parseQuery, rowMatches } from './lib/search'
 import type { Place, Pv, Row } from './lib/types'
 import { Barcode } from './components/Barcode'
 import { Coverage } from './components/Coverage'
@@ -83,13 +84,15 @@ export default function App() {
   const [fams, setFams] = useState<Set<string>>(new Set())
   const [status, setStatus] = useState<StatusFilter>('all')
   const [sort, setSort] = useState<'date' | 'gravity'>('gravity')
+  const [q, setQ] = useState(params.get('q') ?? '')
 
   // Adresse partageable : la commune et la période sont dans l'URL.
   useEffect(() => {
     if (!commune || DEMO) return
     const p = new URLSearchParams({ c: commune.code, n: commune.name, from, to })
+    if (q.trim()) p.set('q', q.trim())
     window.history.replaceState(null, '', `?${p}`)
-  }, [commune, from, to])
+  }, [commune, from, to, q])
 
   const abort = useRef<AbortController | null>(null)
   const load = useCallback(async () => {
@@ -150,6 +153,8 @@ export default function App() {
   const allPvs = useMemo(() => buildPvs(rows), [rows])
   const presentFams = useMemo(() => FAMILIES.filter((f) => allPvs.some((p) => p.byFamily[f.id])), [allPvs])
 
+  const terms = useMemo(() => parseQuery(q), [q])
+
   const pvs: Pv[] = useMemo(() => {
     const filtered = rows.filter(
       (r) =>
@@ -157,17 +162,22 @@ export default function App() {
         (!reseau || (r.reseaux ?? []).some((x) => x.code === reseau)),
     )
     const all = buildPvs(filtered)
-    if (!fams.size) return all
-    // Filtre par famille : on ne garde que les PV qui la contiennent, et seulement ses lignes.
+    if (!fams.size && !terms.length) return all
+    // Filtres par famille et par recherche de paramètre : on ne garde que les PV
+    // qui contiennent les lignes demandées, et seulement ces lignes.
     return all
       .map((pv) => {
-        const rs = pv.rows.filter((r) => fams.has(r.family))
+        const rs = pv.rows
+          .filter((r) => !fams.size || fams.has(r.family))
+          .filter((r) => rowMatches(r, terms))
         const byFamily: Record<string, number> = {}
         rs.forEach((r) => (byFamily[r.family] = (byFamily[r.family] ?? 0) + 1))
         return { ...pv, rows: rs, byFamily, nParams: rs.length, nLimit: rs.filter((r) => r.flag === 'limit').length, nRef: rs.filter((r) => r.flag === 'ref').length }
       })
       .filter((pv) => pv.rows.length)
-  }, [rows, site, reseau, fams])
+  }, [rows, site, reseau, fams, terms])
+
+  const matchCount = useMemo(() => pvs.reduce((a, p) => a + p.nParams, 0), [pvs])
 
   const cov = useMemo(() => coverage(pvs), [pvs])
   const series = useMemo(() => buildSeries(pvs), [pvs])
@@ -177,7 +187,7 @@ export default function App() {
     return sort === 'gravity' ? [...l].sort(byGravity) : l
   }, [pvs, status, sort])
   const open = pvs.find((p) => p.id === openId) ?? null
-  const ctx = { commune: commune?.name ?? '', from, to, demo: DEMO }
+  const ctx = { commune: commune?.name ?? '', from, to, demo: DEMO, q: q.trim() }
 
   const stats = useMemo(() => {
     const keys = new Set<string>()
@@ -365,7 +375,46 @@ export default function App() {
                 </section>
                 </Fold>
 
-                <SummaryBar stats={stats} active={status} onSelect={(s) => { setStatus(s); setTab('pv'); setMview('list') }} last={last} onOpen={setOpenId} />
+                <section className="searchbar" aria-label="Recherche de paramètres">
+                  <label className="field">
+                    <span>Rechercher un paramètre ou une catégorie</span>
+                    <input
+                      type="search"
+                      placeholder="ex. atrazine, glyphosate, PFAS, plomb…"
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      aria-describedby="search-help"
+                    />
+                  </label>
+                  <p id="search-help" className="search-hint">
+                    {terms.length > 0 ? (
+                      <>
+                        <b>{pvs.length}</b> prélèvement{pvs.length > 1 ? 's' : ''} · <b>{matchCount}</b> paramètre
+                        {matchCount > 1 ? 's' : ''} correspondant{matchCount > 1 ? 's' : ''}
+                        <button type="button" className="link" onClick={() => setQ('')}>
+                          effacer
+                        </button>
+                      </>
+                    ) : (
+                      <>Un nom de paramètre (« atrazine »), plusieurs séparés par des virgules, ou une catégorie (« PFAS », « pesticides », « métaux »).</>
+                    )}
+                  </p>
+                </section>
+
+                {terms.length > 0 && pvs.length === 0 && (
+                  <div className="alert neutral" role="status">
+                    <strong>Aucune analyse ne correspond à « {q.trim()} ».</strong>
+                    <p>
+                      Essayez un nom plus court, une catégorie (« PFAS », « pesticides », « métaux ») ou plusieurs termes séparés par des virgules.
+                      Vérifiez aussi la période et l’emplacement choisis.
+                    </p>
+                    <button type="button" className="btn" onClick={() => setQ('')}>
+                      Effacer la recherche
+                    </button>
+                  </div>
+                )}
+
+                {pvs.length > 0 && <SummaryBar stats={stats} active={status} onSelect={(s) => { setStatus(s); setTab('pv'); setMview('list') }} last={last} onOpen={setOpenId} />}
 
                 {simple ? (
                   <>
@@ -376,6 +425,7 @@ export default function App() {
                         <div className="pv-tools">
                           <span className="muted small">
                             {shown.length} prélèvement{shown.length > 1 ? 's' : ''}
+                            {terms.length > 0 && <> pour « {q.trim()} »</>}
                             {status !== 'all' && (
                               <button type="button" className="link" onClick={() => setStatus('all')}>
                                 tout afficher
@@ -383,7 +433,7 @@ export default function App() {
                             )}
                           </span>
                         </div>
-                        <PvCards pvs={[...shown].sort(byGravity)} onOpen={setOpenId} />
+                        <PvCards pvs={[...shown].sort(byGravity)} onOpen={setOpenId} searching={terms.length > 0} />
                       </div>
                     )}
                     <nav className="bottomnav" aria-label="Navigation mobile">
@@ -431,6 +481,7 @@ export default function App() {
                     <div className="pv-tools">
                       <span className="muted small">
                         {shown.length} procès-verbal{shown.length > 1 ? 'aux' : ''} affiché{shown.length > 1 ? 's' : ''}
+                        {terms.length > 0 && <> pour « {q.trim()} »</>}
                         {status !== 'all' && (
                           <button type="button" className="link" onClick={() => setStatus('all')}>
                             tout afficher
@@ -451,7 +502,7 @@ export default function App() {
                       <Timeline pvs={pvs} onOpen={setOpenId} />
                     </div>
                   )}
-                  {tab === 'pv' && <PvTable pvs={shown} onOpen={setOpenId} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
+                  {tab === 'pv' && <PvTable pvs={shown} onOpen={setOpenId} searching={terms.length > 0} onPdf={(pv) => exportPdf(ctx, [pv], { detail: true, filename: `pv-${pv.id}.pdf` })} />}
                   {tab === 'heat' && <Heatmap pvs={pvs} series={series} onOpen={setOpenId} />}
                   {tab === '3d' && (
                     <Suspense fallback={<p className="empty">Chargement de la vue 3D…</p>}>

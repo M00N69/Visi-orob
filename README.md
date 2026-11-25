@@ -7,6 +7,7 @@ l'API officielle **Hub'Eau** (résultats du contrôle sanitaire, base SISE-Eaux)
 
 - Choix région → département → commune (ou recherche directe par nom), et période (presets ou dates libres).
 - **Procès-verbaux** : un prélèvement = une ligne, avec sa conclusion sanitaire et les types d'analyses réalisées.
+- **Recherche par paramètre** : barre de recherche sur la liste des prélèvements (un ou plusieurs termes séparés par des virgules, ou une catégorie : PFAS, pesticides, métaux…).
 - **Code-barres des analyses** : une colonne par PV, une ligne par famille (pesticides, PFAS, métaux, microbiologie…).
   Les PV à liste réduite sont repérés visuellement.
 - **Couverture des analyses** : pour chaque famille, matrice paramètre × date (mesuré / non mesuré / dépassement).
